@@ -1,0 +1,155 @@
+---
+title: "Mexico's CO2 Emissions"
+author: "Tahmid Ahmed"
+date: "4/10/2020"
+output: html_document
+---
+
+```{r setup, include = FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+# Downloaded all packages for exam_1.
+library(readr)
+library(tidyverse)
+library(janitor)
+library(reprex)
+library(gt)
+library(rvest)
+```
+
+```{r, include = FALSE, echo = FALSE}
+# Loaded paris data using mkdir in terminal. What I found very helpful was that
+# if I open the .Rproj for ps_3, what I typed in my terminal was still saved.
+# Thus, by looking at ps_3 terminal, I was able to know how to create a new
+# directory and move files for the exam. This taught me that if I am stuck in
+# what to put in a terminal, I can open a previous project and see what I did
+# there to give me a better picture of what to do.
+paris <- read_csv('raw-data/paris.csv', 
+  col_types = cols(code = col_character(),
+  name = col_character(),
+  signature = col_date(format = ""),
+  ratification = col_date(format = ""),
+  kind = col_character(),
+  date_of_effect = col_date(format = ""),
+  emissions = col_double(),
+  percentage = col_double(),
+  year = col_double())) %>% 
+clean_names()
+paris
+```
+
+```{r, include = FALSE, echo = FALSE}
+# Madlibs Question 5 setup 
+# Loading my co2 data gave me a lot of trouble as I kept getting warnings. I
+# knew I had to do skip = 4, because I saw the first few rows had NA's in them.
+# I also thought I was going to have to change all the year column types to
+# col_double. However, when I ran the data, I saw that all the columns but 2019
+# were col_double(). The warning said `2019` = col_logical() when all the other
+# years were col_double. Thus, I changed the column type of 2019 to col_double
+# and ran the code with clean_names(). The warning went away as a result. I
+# learned from loading the co2 data that it is important to look at the warning
+# messages and the column types of your data to get a better grasp of what the
+# errors mean.
+WB_co2_emisions <- read_csv('raw-data/WB_co2_emisions.csv',
+                            skip = 4,
+                            col_types = cols(
+                            `2019` = col_double())
+                            ) %>%
+  clean_names()
+WB_co2_emisions
+```
+
+
+```{r, include = FALSE, echo = FALSE}
+# Question 2 setup
+# To make the  tidy table, I knew I had to use pivot_longer in our WB data
+# similar to what we did in the last pset. The hint said to use names_prefix,
+# which I did not really understand what it did. I then ran ?pivot_longer, and
+# saw that names_prefix drops the prefix. I did not understand why we had to
+# drop the prefix, but just like before a skill I learned was that if you are
+# ever confused by what a command does look at your data to see if it could
+# help. I looked at my data, and saw that all the years had a prefix, "x". Thus,
+# I knew I had to do names_prefix = "x" inside my pivot_longer. In addition, I
+# thought I was done by just doing pivot_longer(cols = starts_with("x"),
+# names_prefix = "x") and then using the select command to pick the variables I
+# want to use. However, the question said that I should have an
+# emissions_par_capita and year variable. Thus, I saw in "help" that
+# pivot_longer can be read like a story. Essentially, I followed the guidelines
+# of using names_to and values_to. I will say that I did not do names_ptypes =
+# list(year = double()) originally but when I had to make the graph, I had to do
+# scale_x_discrete instead of scale_x_contintous and the reason for this was
+# that my year column was not a column double type. This also made more sense to
+# me because year should be treated as a col_double() since it's represented as
+# a number. Thus, I put later names_ptypes = list(year = double()) on to use
+# scale_x_continous. Using pivot_longer also made my code more concise because I
+# did not need to use the select command after as the table displayed the right
+# amount of information. Using pivot_longer taught me that sometimes it is
+# important to put all, or most, of the arguments in a command rather than just
+# a few.
+table <- WB_co2_emisions %>%
+      pivot_longer(
+  cols = starts_with("x"),
+  names_to = "year",
+  names_prefix = "x",
+  values_to = "emissions_per_capita",
+  values_drop_na = TRUE,
+  names_ptypes = list(year = double()))
+table
+```
+
+```{r, include = FALSE, echo = FALSE}
+# After creating my tidy table, the question asked that I joined my paris data
+# with my new co2 data. I decided to use full_join to be on the safe side in
+# that I will have the data I need for this question. Moreover, I originally did
+# full_join by year and code, but I realized that the year in the paris and co2
+# data have different meanings. This was also clarified in Piazza. Thus, I felt
+# that it was better to full_join by country name and country code, since these
+# two variables mean the same for both datasets. In addition, it was said on
+# Piazza that it was okay to join by name and country. However, since I was
+# joining by name and country, I knew that there would be two year columns;
+# based on Datacamp, I remember that I can use suffix to distinguish between the
+# year columns. I decided to do suffix = c("_wb", _"paris") for the sake of
+# clarity.
+joineddata <- table %>%
+  full_join(paris, by = c("country_name" = "name", "country_code" = "code"), 
+            suffix = c("_wb", "_paris"))
+joineddata
+```
+
+```{r, include = FALSE, echo = FALSE}
+# Furthermore, I decided to look at Mexico and see how its emissions per capita
+# changed over time and its date of effect of the Paris Treaty Accord. I will
+# say that I wish I had more data, so that I can see the trends of emissions
+# after the date of effect of the Paris Treaty Accord. In addition, I knew that
+# I had to use the filter command to choose Mexico instead of the select
+# command, because the select command does not let me look at a specific
+# country. It will only let me look at the general column of country.
+mex_joined <- joineddata %>%
+  filter(country_name == "Mexico")
+mex_joined
+```
+
+```{r, echo = FALSE}
+# This was the most fun part of the problem, because I get to graph the plot
+# with aesthetics. The trickiest part of graphing was making the vertical line;
+# however, Stack Exchange helped a lot and I learned to make the vertical line.
+# It is important to know that I originally did scale_x_discrete at first since
+# the year variable was not treated as a col_double(). This made my code appear
+# a bit funky; for example, I would label my vertical line at xintercept = 57
+# instead of xintercept = 2016. However, by changing year to col_double(), I was
+# able to make my code look more proper by doing geom_vline(xintercept = 2016)
+# as an example.
+ggplot(mex_joined, aes(year_wb, emissions_per_capita)) + 
+  geom_point() +
+    scale_x_continuous( 
+      labels = c("1960", "1980", "2000"),
+      breaks = c(1960, 1980, 2000)) +
+  geom_vline(xintercept = 2016) + 
+  annotate(geom = "text", x = 2014, y = 3.1, 
+           label = "Year Paris Accord
+Took Effect", color = "blue", fontface = "bold",
+              angle = 90) +
+  labs(title = "Mexico's CO2 Emissions Per Capita") +
+  xlab(label = "Year") +
+  ylab(label = "Metric Tons Per Capita") +
+  theme_classic()
+```
